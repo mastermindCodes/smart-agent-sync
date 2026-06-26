@@ -10,17 +10,17 @@ One prompt. You paste it into your agent. The agent reads your system and sets e
 
 ```bash
 # Option 1: copy URL, open in browser, copy raw content
-curl -fsSL https://raw.githubusercontent.com/<your-user>/hermes-sync/main/PROMPT.md
+curl -fsSL https://raw.githubusercontent.com/mastermindCodes/hermes-sync/main/PROMPT.md
 
 # Option 2: pipe directly into clipboard
-curl -fsSL https://raw.githubusercontent.com/<your-user>/hermes-sync/main/PROMPT.md | pbcopy  # macOS
-curl -fsSL https://raw.githubusercontent.com/<your-user>/hermes-sync/main/PROMPT.md | clip    # Windows
-curl -fsSL https://raw.githubusercontent.com/<your-user>/hermes-sync/main/PROMPT.md | xclip   # Linux
+curl -fsSL https://raw.githubusercontent.com/mastermindCodes/hermes-sync/main/PROMPT.md | pbcopy  # macOS
+curl -fsSL https://raw.githubusercontent.com/mastermindCodes/hermes-sync/main/PROMPT.md | clip    # Windows
+curl -fsSL https://raw.githubusercontent.com/mastermindCodes/hermes-sync/main/PROMPT.md | xclip   # Linux
 
 # Then paste into your agent
 ```
 
-Or just open the [raw PROMPT.md](https://raw.githubusercontent.com/<your-user>/hermes-sync/main/PROMPT.md) and copy-paste.
+Or just open the [raw PROMPT.md](https://raw.githubusercontent.com/mastermindCodes/hermes-sync/main/PROMPT.md) and copy-paste.
 
 ## What syncs
 
