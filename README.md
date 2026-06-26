@@ -1,9 +1,3 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/smart--agent-sync-blue?style=flat-square">
-  <img src="https://img.shields.io/badge/license-GPLv3-blue?style=flat-square">
-  <img src="https://img.shields.io/badge/one--prompt-deploy-orange?style=flat-square">
-</p>
-
 # smart-agent-sync
 
 One prompt. Paste into your AI agent. Git-based multi-device sync for config, skills, memories, and session notes.
