@@ -1,4 +1,4 @@
-# hermes-sync — Multi-Device Sync Setup
+# agent-sync — Multi-Device Sync Setup
 
 This prompt tells you (the AI agent) to set up git-based sync for this Hermes / OpenClaw / Claude Code / Codex / other AI agent installation.
 
