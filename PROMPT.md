@@ -24,11 +24,30 @@ Try these in order until you find one that exists:
 
 Set `AGENT_HOME` to the resolved path. If you can't find it, ask the user where their agent stores data.
 
-**Clone detection:** If the user passes `--clone` as an argument to their prompt (e.g. "hermes-sync --clone"), set `IS_CLONE=true`. Otherwise `IS_CLONE=false`.
+**Clone detection:** Check if `$AGENT_HOME` already has significant config (config.yaml, skills/ with files). If yes, this is likely a second device. Also check if user says "second device", "clone", or "mirror".
+
+Modes (ask the user if not obvious from context):
+- **merge** (default): Compare local and remote config, merge intelligently, keep the best of both
+- **mirror**: Discard local state, pull exactly what's on remote (pure backup restore)
+- **override**: Discard remote, push local as new truth (first device setup)
 
 ---
 
-## Step 2: Create .gitignore
+## Step 2: Ask user for git remote + mode
+
+Ask the user:
+
+> *"I'll set up git sync for your agent. I need:*
+> 1. *Git remote URL (e.g. `https://github.com/user/agent-sync.git`)*
+> 2. *Repo will be **private** — your API keys live there.*
+> 3. *Mode: **merge** (combine best from both), **mirror** (copy from remote), or **override** (push local)?*
+> 4. *Anything you DON'T want synced? (e.g. `.env`, `certain_skill`)*"
+
+If user says nothing about mode, default to **merge** for second device, **override** for first.
+
+---
+
+## Step 3: Create .gitignore
 
 Write this file at `$AGENT_HOME/.gitignore`:
 
@@ -72,65 +91,139 @@ provider_models_cache.json
 
 ---
 
-## Step 3: Init git repo or clone
+## Step 4: Init git repo — three modes
 
-Check if `$AGENT_HOME` is already a git repo (`git -C "$AGENT_HOME" rev-parse --git-dir`).
+You already have the remote URL and mode from Step 2. Also have `$EXCLUDED_PATHS` (list of files/dirs user doesn't want synced — remove them from `.gitignore` before committing).
 
-**If NOT a git repo AND IS_CLONE is false:**
+### Mode A: override (first device — push local as truth)
 
 ```bash
 cd "$AGENT_HOME"
 git init
 git checkout -b main
 git add -A
-git commit -m "init: hermes-sync base state"
-```
-
-Ask the user for their git remote URL (e.g. `git@github.com:user/hermes-sync.git` or `https://github.com/user/hermes-sync.git`). Then:
-
-```bash
-git remote add origin <URL>
+git commit -m "init: agent-sync base state"
+git remote add origin <USER_REMOTE_URL>
 git push -u origin main
 ```
 
-If push fails with an auth error, tell the user: *"Git push requires authentication. Your OS credential manager should pop up — authenticate once, then I'll retry."* Then retry the push. If it fails again, guide the user to set up a Personal Access Token.
+If push fails with auth error: *"Your OS credential manager should pop up — authenticate once, then I'll retry."* Retry. If fails again, guide user to create a Personal Access Token.
 
-**If ALREADY a git repo or IS_CLONE is true:**
-
-If `$AGENT_HOME` is already a git repo with a remote set, pull the latest:
+### Mode B: mirror (second device — discard local, copy remote)
 
 ```bash
 cd "$AGENT_HOME"
-git fetch origin
-git reset --hard origin/main
-# Remove device-specific files that shouldn't be overwritten from remote
-rm -f state.db state.db-shm state.db-wal sessions.db 2>/dev/null
-rm -rf cache/ logs/ sandboxes/ audio_cache/ image_cache/ bin/ 2>/dev/null
+# Backup anything user might want locally
+mkdir -p /tmp/agent-sync-backup
+cp sessions/*.md /tmp/agent-sync-backup/ 2>/dev/null || true
+
+# Wipe and clone fresh
+cd ..
+mv "$(basename "$AGENT_HOME")" "$(basename "$AGENT_HOME")_old" 2>/dev/null || true
+git clone <USER_REMOTE_URL> "$(basename "$AGENT_HOME")"
+cd "$AGENT_HOME"
+
+# Restore device-specific files (NOT config, skills, memories — those come from remote)
+rm -f state.db state.db-shm state.db-wal sessions.db cache/ -rf 2>/dev/null
+cp /tmp/agent-sync-backup/*.md sessions/ 2>/dev/null || true
+rm -rf /tmp/agent-sync-backup /tmp/"$(basename "$AGENT_HOME")_old" 2>/dev/null || true
+
+# Regenerate device-specific data
+mkdir -p cache/ logs/ audio_cache/ 2>/dev/null
 ```
 
-If it's not a git repo yet (clone scenario), clone fresh:
+### Mode C: merge (second device — keep best of both — DEFAULT)
+
+This is the smart one. For each synced directory, compare local vs remote. For text files that are both new (skills, config), diff and merge. For same keys, newer wins. For conflicts, ask user.
+
+**Step C1: Get remote into a temp branch**
 
 ```bash
-# Move existing data aside temporarily (user's current sessions, etc.)
-backup_dir=$(mktemp -d)
-cp -r "$AGENT_HOME/config.yaml" "$AGENT_HOME/.env" "$AGENT_HOME/skills" "$AGENT_HOME/memories" "$AGENT_HOME/cron" "$backup_dir/" 2>/dev/null || true
+cd "$AGENT_HOME"
+git init
+git checkout -b main
+git remote add origin <USER_REMOTE_URL>
+git fetch origin
 
-# Clone
-cd "$(dirname "$AGENT_HOME")" && git clone <URL> "$(basename "$AGENT_HOME")" 2>/dev/null || \
-  (cd "$AGENT_HOME" && git init && git remote add origin <URL> && git fetch origin && git reset --hard origin/main)
-
-# Restore local data that isn't in git yet, then add+commit
-cp -r "$backup_dir/"* "$AGENT_HOME/" 2>/dev/null || true
-rm -rf "$backup_dir"
-rm -f "$AGENT_HOME/state.db" "$AGENT_HOME/state.db-shm" "$AGENT_HOME/state.db-wal" "$AGENT_HOME/sessions.db" 2>/dev/null
-rm -rf "$AGENT_HOME/cache/" "$AGENT_HOME/logs/" "$AGENT_HOME/sandboxes/" "$AGENT_HOME/audio_cache/" "$AGENT_HOME/image_cache/" "$AGENT_HOME/bin/" 2>/dev/null
+# If remote has content
+if git rev-parse origin/main >/dev/null 2>&1; then
+    git branch local-state main
+    git reset --hard origin/main
+    git branch remote-state origin/main
 ```
 
-If no remote is provided (user hasn't created a git repo yet in clone scenario), fall back to the init path above and tell the user to create a repo first.
+**Step C2: For each synced item, merge intelligently**
+
+For each file/dir in the sync list (config.yaml, .env, skills/, memories/, cron/, sessions/, SOUL.md, plugins/):
+
+| Situation | Action |
+|-----------|--------|
+| Only on remote, not local | Keep remote (it's new) |
+| Only on local, not remote | Add to git, commit as new |
+| Both exist, text file | `git diff local-state..remote-state -- <file>` — if only one side changed, keep that. If both changed, three-way merge |
+| Both exist, skill dir | Walk each skill file. Same logic: newer per-file |
+| Both exist, config.yaml | Section-level merge: newer per-key. Commented lines keep their comments |
+| Both exist, sessions/*.md | Both are append-only — concatenate, sort by timestamp, dedupe. Append-only means no conflict |
+| Binary / DB file | Skip (they're in .gitignore anyway) |
+
+Use Python or the agent's tools to do per-key config merging:
+
+```python
+# Example: merge config.yaml section by section
+import yaml, json
+with open('local_config.yaml') as f: local = yaml.safe_load(f)
+with open('remote_config.yaml') as f: remote = yaml.safe_load(f)
+
+merged = {}
+for section in set(list(local.keys()) + list(remote.keys())):
+    lv = local.get(section, {})
+    rv = remote.get(section, {})
+    if isinstance(lv, dict) and isinstance(rv, dict):
+        merged[section] = {**rv, **lv}  # local keys override remote
+    elif lv != rv:
+        merged[section] = lv  # prefer local for scalar conflicts
+    else:
+        merged[section] = lv
+
+with open('merged_config.yaml', 'w') as f:
+    yaml.dump(merged, f)
+```
+
+For skill files: walk `skills/` directories. If a skill exists in both, compare each file — newer modification time wins. If same mtime, content diff — if different, ask user or auto-pick local.
+
+**Step C3: Commit merged state**
+
+```bash
+git add -A
+git commit -m "merge: combined local and remote state"
+git push -u origin main
+```
+
+Remove temp branches:
+
+```bash
+git branch -D local-state remote-state 2>/dev/null || true
+```
+
+### Handle excluded paths
+
+Before every commit, remove user's excluded paths from tracking:
+
+```bash
+echo "$EXCLUDED_PATHS" | while read path; do
+    echo "$path" >> .gitignore
+    git rm --cached "$path" 2>/dev/null || true
+done
+git add -A
+```
+
+### Auth fallback (all modes)
+
+If push fails: *"Git push needs authentication. OS credential manager will pop up."* Retry. If fails again, guide user to create PAT at github.com/settings/tokens.
 
 ---
 
-## Step 4: Create sessions directory
+## Step 5: Create sessions directory
 
 ```bash
 mkdir -p "$AGENT_HOME/sessions"
@@ -140,7 +233,7 @@ This directory holds compact session summary notes — one markdown file per day
 
 ---
 
-## Step 5: Install session-summary hook
+## Step 6: Install session-summary hook
 
 Figure out which agent this is. Create the appropriate hook.
 
@@ -204,11 +297,11 @@ Make it executable. Tell the user to wire it into their agent's session-end call
 
 ### For Claude Code / Codex / Other
 
-Find their equivalent lifecycle hook (session_end, on_exit, post_prompt, etc.) and install a matching script. If none exists, install a wrapper script and tell the user to run it manually on session end, or use the cron-based auto-commit as a fallback (Step 6).
+Find their equivalent lifecycle hook (session_end, on_exit, post_prompt, etc.) and install a matching script. If none exists, install a wrapper script and tell the user to run it manually on session end, or use the cron-based auto-commit as a fallback (Step 7).
 
 ---
 
-## Step 6: Set up auto-sync schedule
+## Step 7: Set up auto-sync schedule
 
 Commit and push every 30 minutes. Detect the best scheduling mechanism.
 
@@ -319,51 +412,51 @@ If git-bash not found, try `wsl.exe git` or `C:\Windows\System32\bash.exe` (WSL)
 
 ---
 
-## Step 7: First local commit after clone
+## Step 8: First local commit after clone
 
-If this is a second device (IS_CLONE was true):
+If mode was **mirror** or **merge**: this step is already done as part of Step 4.
 
-```bash
-cd "$AGENT_HOME"
-git add -A
-git diff --cached --quiet || git commit -m "sync: updates from $(hostname)"
-git push
-```
+If mode was **mirror**: no extra commit needed, remote is the source of truth.
 
 ---
 
-## Step 8: Report to user
+## Step 9: Report to user
 
 Print a summary of what was set up:
 
 ```
-✅ hermes-sync installed
+✅ agent-sync installed
 
 Agent home: $AGENT_HOME
-Git remote: <remote URL>
-Auto-sync: every 30 minutes (via <cron/systemd/launchd/task-scheduler>)
+Mode: <override/mirror/merge>
+Git remote: <USER_REMOTE_URL>
+Auto-sync: every 30 minutes (via <built-in cron/systemd/launchd/task-scheduler/crontab>)
 Session notes: $AGENT_HOME/sessions/
 Gitignore: $AGENT_HOME/.gitignore
+Excluded: <anything user opted out of>
 
 Session summary hook: <how it was installed>
 
-On your other devices, run the same prompt. Your git remote already exists,
-so the agent will clone instead of init.
+On your other devices, run the same prompt.
+The agent will detect it's a second device and offer merge (default) or mirror mode.
 
 ⚠️  .env is INCLUDED in git (API keys). If you don't want secrets in git:
    echo '.env' >> $AGENT_HOME/.gitignore && git rm --cached .env && git commit -m "stop syncing .env"
 
 Next steps:
   - Make a test commit: cd $AGENT_HOME && git add -A && git commit -m "test sync" && git push
-  - On other device: run the same prompt (agent detects it should clone)
+  - On other device: run this same prompt — agent handles merge/mirror automatically
 ```
 
 ---
 
 ## Notes for the implementing agent
 
-- **Do not delete or overwrite user data.** The clone step for second devices removes only `state.db`, `cache/`, `logs/` etc. — these are regenerated.
+- **Repo is private.** Tell user to create a private repo. Mention public repos leak API keys.
+- **User can say "exclude X"** — add to `.gitignore` and `git rm --cached` before first commit.
+- **Do not delete or overwrite user data.** Mirror mode removes only `state.db`, `cache/`, `logs/` etc. — these are regenerated. Merge mode keeps everything.
 - **If `git push` asks for credentials**, let the OS credential manager pop up. On macOS it's `osxkeychain`, on Windows it's `git-credential-manager`, on Linux it's `libsecret` or `manager-core`. The user authenticates once.
 - **If no credential helper is configured**, tell the user to set one up: `git config --global credential.helper <helper>` or use SSH (`ssh-keygen -t ed25519` + add to GitHub).
 - **The session-summary script must NOT block or prompt.** It runs silently on session end.
 - **If you can't find an agent lifecycle hook** (e.g. for an unfamiliar agent), fall back to a wrapper script and tell the user to run it manually before closing their session.
+- **Merge mode: config.yaml is merged per-section, skills are merged per-file, sessions/*.md are concatenated and deduped.** This is the key feature — make it work well.
