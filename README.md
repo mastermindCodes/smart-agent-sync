@@ -36,43 +36,36 @@ Or just open the [raw PROMPT.md](https://raw.githubusercontent.com/mastermindCod
 
 Ignores: state.db, sessions.db, cache/, logs/, *.bak, *.lock (all regenerated or machine-specific).
 
+## Smart mode (default)
+
+No mode-picking. Agent figures it out:
+
+| Situation | What happens |
+|-----------|-------------|
+| First device, repo empty | Uploads local config to git |
+| Second device, repo has data | Pulls remote, compares local vs remote, auto-merges what it can, **asks you only on real conflicts** |
+
+If you want to force a specific behavior: `--update` (replace remote), `--mirror` (discard local), or `--merge` (auto-merge silently).
+
+### How merge works
+
+| Item | Merge strategy |
+|------|---------------|
+| config.yaml | Section by section, local keys win at key level |
+| skills/ | Per-file, newer mtime wins. Both changed? Asks you |
+| sessions/*.md | Append-only — concatenate, sort, dedupe. No conflicts |
+| Everything else | If only on one side, it's included |
+
 ## Device setup
 
-Three modes. Agent asks which one.
-
-| Mode | What it does |
-|------|-------------|
-| **update** | Push/replace remote with local (first device or reset) |
-| **mirror** | Discard local, copy remote exactly |
-| **merge** | Smart merge both sides **✅ recommended** |
-
-In **merge mode**, the agent:
-- `config.yaml`: merged per-section, local keys win on conflict
-- `skills/`: merged per-file, newer mtime wins
-- `sessions/*.md`: concatenated and deduped by timestamp
-- Everything else: if only on one side, it's included
+1. Paste PROMPT.md into your agent on device 1
+2. Give it a git remote URL
+3. Agent does the rest — creates repo, pushes, sets up session summaries + auto-sync
+4. On device 2: paste same prompt. Smart mode detects existing remote, merges.
 
 ## Repo must be private
 
-Your `.env` (API keys) is in sync by default. Use a **private** GitHub/GitLab repo. If you don't want API keys in git, tell the agent to exclude `.env`.
-
-## How session summaries work
-
-On `/new` (or session end), your agent writes a compact note to `sessions/YYYY-MM-DD.md`:
-
-```
-## 2026-06-26T17:30 — fixed DB migration bug
-- what: alembic version table not seeded on fresh DB
-- fix: stamp head in init script
-- files: scripts/init_db.sh, alembic/env.py
-- decisions: skip CI squash this time
-```
-
-One file per day. Append-only. Git-friendly. No merge conflicts.
-
-## Auto-sync
-
-Agent sets up a 30-minute auto-commit+push schedule using whatever cron system your platform has (systemd timer, launchd, Task Scheduler, or the agent's built-in cron if available).
+Your .env (API keys) is in sync by default. Use a **private** repo. If you don't want keys in git, tell the agent to exclude .env.
 
 ## Requirements
 
