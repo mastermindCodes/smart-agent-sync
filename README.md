@@ -4,23 +4,19 @@ Set up git-based multi-device sync for your AI agent (Hermes, OpenClaw, Claude C
 
 Syncs config, skills, memories, cron jobs, and compact session notes across devices via git. No cloud drives. No daemons. No binary blobs.
 
-## How it works
+## How to use
 
-One prompt. You paste it into your agent. The agent reads your system and sets everything up.
+Tell your agent:
 
-```bash
-# Option 1: copy URL, open in browser, copy raw content
-curl -fsSL https://raw.githubusercontent.com/mastermindCodes/agent-sync/main/PROMPT.md
+> Set up agent-sync from https://github.com/mastermindCodes/agent-sync
 
-# Option 2: pipe directly into clipboard
-curl -fsSL https://raw.githubusercontent.com/mastermindCodes/agent-sync/main/PROMPT.md | pbcopy  # macOS
-curl -fsSL https://raw.githubusercontent.com/mastermindCodes/agent-sync/main/PROMPT.md | clip    # Windows
-curl -fsSL https://raw.githubusercontent.com/mastermindCodes/agent-sync/main/PROMPT.md | xclip   # Linux
+That's it. Agent clones the repo, reads the prompt, shows you what it'll do, asks confirmation, and builds everything.
 
-# Then paste into your agent
+Or paste the raw prompt directly:
+
 ```
-
-Or just open the [raw PROMPT.md](https://raw.githubusercontent.com/mastermindCodes/agent-sync/main/PROMPT.md) and copy-paste.
+https://raw.githubusercontent.com/mastermindCodes/agent-sync/main/PROMPT.md
+```
 
 ## What syncs
 
@@ -45,7 +41,7 @@ No mode-picking. Agent figures it out:
 | First device, repo empty | Uploads local config to git |
 | Second device, repo has data | Pulls remote, compares local vs remote, auto-merges what it can, **asks you only on real conflicts** |
 
-If you want to force a specific behavior: `--update` (replace remote), `--mirror` (discard local), or `--merge` (auto-merge silently).
+If you want to force: `--update` (replace remote), `--mirror` (discard local), or `--merge` (auto-merge silently).
 
 ### How merge works
 
@@ -55,13 +51,6 @@ If you want to force a specific behavior: `--update` (replace remote), `--mirror
 | skills/ | Per-file, newer mtime wins. Both changed? Asks you |
 | sessions/*.md | Append-only — concatenate, sort, dedupe. No conflicts |
 | Everything else | If only on one side, it's included |
-
-## Device setup
-
-1. Paste PROMPT.md into your agent on device 1
-2. Give it a git remote URL
-3. Agent does the rest — creates repo, pushes, sets up session summaries + auto-sync
-4. On device 2: paste same prompt. Smart mode detects existing remote, merges.
 
 ## Repo must be private
 
