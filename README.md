@@ -1,6 +1,6 @@
 # smart-agent-sync
 
-One prompt. Paste into your AI agent. Git-based multi-device sync for config, skills, memories, and session notes.
+Prompt for Git-based multi-device agent workspace sync.
 
 ```
 Set up smart-agent-sync from https://github.com/mastermindCodes/smart-agent-sync
