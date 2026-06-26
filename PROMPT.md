@@ -2,6 +2,8 @@
 
 This prompt tells you (the AI agent) to set up git-based sync for this Hermes / OpenClaw / Claude Code / Codex / other AI agent installation.
 
+**IMPORTANT: Before doing ANYTHING, show the user a summary of what will happen and ask for confirmation (Step 2a). Do not modify files or run commands until the user says yes.**
+
 Follow these instructions exactly. Do not skip steps. Do not ask questions — figure it out from the system.
 
 ---
@@ -26,20 +28,51 @@ Set `AGENT_HOME` to the resolved path. If you can't find it, ask the user where 
 
 ---
 
-## Step 2: Ask user for git remote
+## Step 2: Show summary, ask confirmation, check git auth
 
-Ask the user:
+**Step 2a: Show user what will happen**
 
-> *"I'll set up git sync for your agent. I need:*
-> 1. *Git remote URL (e.g. `https://github.com/user/agent-sync.git`)*
-> 2. *Repo will be **private** — your API keys live there.*
-> 3. *Anything you DON'T want synced? (e.g. `.env`, `certain_skill`)*"
+Before doing anything, print a clear summary:
 
-The agent uses **Smart mode** by default. No need to pick a mode — agent detects:
-- No remote content? Upload local.
-- Remote has content? Pull, compare, analyze diffs, then prompt user.
+```
+? agent-sync will:
+  1. Detect your agent home directory
+  2. Create a private git repo at <URL>
+  3. Upload your config, skills, memories, cron, and session notes
+  4. Set up 30-min auto-sync so other devices stay in sync
+  5. Install session-summary hook (appends compact note on session end)
 
-Only override with explicit flag: `--update`, `--mirror`, or `--merge`.
+Your API keys in .env will be synced unless you say not to.
+Your state.db, cache/, logs/ will NOT be synced (device-specific).
+
+Ready to proceed? (y/n)
+```
+
+Wait for user confirmation. If they say no, stop and explain what to change.
+
+If they want to exclude something, ask: "Anything you don't want synced? (e.g. `.env`, `certain_skill`)"
+
+**Step 2b: Check git authentication**
+
+Test if git can push:
+
+```bash
+git ls-remote <USER_REMOTE_URL> 2>&1
+```
+
+- If success (returns 0 or shows refs) — auth works, continue.
+- If "Repository not found" — repo doesn't exist yet. Try creating it:
+  - If `gh` CLI available: `gh repo create <name> --private`
+  - If GitHub token available: create via API
+  - Otherwise: tell user "Create a private repo at github.com/new named agent-sync, then come back."
+- If auth error (403/401): "Git needs authentication. Your OS credential manager should pop up."
+  - Retry after user authenticates.
+  - If still fails: guide user to create PAT at github.com/settings/tokens and provide it.
+- If no network: tell user to check connection.
+
+**Step 2c: Ask for remote URL** (if not already provided by user)
+
+Ask for URL only if user didn't include it in their first message.
 
 ---
 
@@ -132,7 +165,7 @@ Walk each synced item and compare:
 | Both sides, auto-mergeable (config keys, session notes) | Merge silently |
 | Both sides, diff, not auto-mergeable | **Ask user** |
 
-Show a diff summary:
+Show a diff summary with recommendation:
 
 ```
 ? Sync analysis for agent at $AGENT_HOME:
@@ -143,6 +176,9 @@ Show a diff summary:
   cron/: only on remote -> keeping
   sessions/2026-06-26.md: local has 2 extra entries
     -> auto-appended (append-only)
+
+Recommendation: merge all (keep best of both — no destructive conflicts)
+Options: [m]erge all | [u]pload local (replace remote) | [r]estore from remote (mirror) | [c]ustom
 ```
 
 After user choice:
