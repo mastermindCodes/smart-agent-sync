@@ -38,15 +38,19 @@ Ignores: state.db, sessions.db, cache/, logs/, *.bak, *.lock (all regenerated or
 
 ## Device setup
 
-**Device 1 (override mode):** Run the prompt. Agent creates git repo, asks for remote URL, pushes your local config as truth.
+Three modes. Agent asks which one.
 
-**Device 2+ (merge mode — default):** Run the same prompt on your other machine. Agent detects existing local config, fetches remote, and **intelligently merges** both sides:
+| Mode | What it does |
+|------|-------------|
+| **update** | Push/replace remote with local (first device or reset) |
+| **mirror** | Discard local, copy remote exactly |
+| **merge** | Smart merge both sides **✅ recommended** |
+
+In **merge mode**, the agent:
 - `config.yaml`: merged per-section, local keys win on conflict
 - `skills/`: merged per-file, newer mtime wins
 - `sessions/*.md`: concatenated and deduped by timestamp
 - Everything else: if only on one side, it's included
-
-You can also pick **mirror mode** (discard local, copy remote) if you want a clean clone.
 
 ## Repo must be private
 

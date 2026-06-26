@@ -40,10 +40,13 @@ Ask the user:
 > *"I'll set up git sync for your agent. I need:*
 > 1. *Git remote URL (e.g. `https://github.com/user/agent-sync.git`)*
 > 2. *Repo will be **private** — your API keys live there.*
-> 3. *Mode: **merge** (combine best from both), **mirror** (copy from remote), or **override** (push local)?*
+> 3. *Mode (pick one):*
+>    - **update** — push/replace remote with local (first device or reset)
+>    - **mirror** — discard local, copy remote exactly
+>    - **merge** — smart merge local + remote (recommended for second device)
 > 4. *Anything you DON'T want synced? (e.g. `.env`, `certain_skill`)*"
 
-If user says nothing about mode, default to **merge** for second device, **override** for first.
+If user says nothing about mode: if no remote repo exists → **update**. If remote exists → **merge**.
 
 ---
 
@@ -95,21 +98,23 @@ provider_models_cache.json
 
 You already have the remote URL and mode from Step 2. Also have `$EXCLUDED_PATHS` (list of files/dirs user doesn't want synced — remove them from `.gitignore` before committing).
 
-### Mode A: override (first device — push local as truth)
+### Mode A: update (push/replace remote with local)
+
+Use for first device setup OR to reset remote to local state.
 
 ```bash
 cd "$AGENT_HOME"
 git init
 git checkout -b main
 git add -A
-git commit -m "init: agent-sync base state"
+git commit -m "init: agent-sync"
 git remote add origin <USER_REMOTE_URL>
-git push -u origin main
+git push -u origin main --force
 ```
 
 If push fails with auth error: *"Your OS credential manager should pop up — authenticate once, then I'll retry."* Retry. If fails again, guide user to create a Personal Access Token.
 
-### Mode B: mirror (second device — discard local, copy remote)
+### Mode B: mirror (discard local, copy remote)
 
 ```bash
 cd "$AGENT_HOME"
@@ -132,7 +137,7 @@ rm -rf /tmp/agent-sync-backup /tmp/"$(basename "$AGENT_HOME")_old" 2>/dev/null |
 mkdir -p cache/ logs/ audio_cache/ 2>/dev/null
 ```
 
-### Mode C: merge (second device — keep best of both — DEFAULT)
+### Mode C: merge (smart merge local + remote — RECOMMENDED)
 
 This is the smart one. For each synced directory, compare local vs remote. For text files that are both new (skills, config), diff and merge. For same keys, newer wins. For conflicts, ask user.
 
@@ -428,7 +433,7 @@ Print a summary of what was set up:
 ✅ agent-sync installed
 
 Agent home: $AGENT_HOME
-Mode: <override/mirror/merge>
+Mode: <update/mirror/merge>
 Git remote: <USER_REMOTE_URL>
 Auto-sync: every 30 minutes (via <built-in cron/systemd/launchd/task-scheduler/crontab>)
 Session notes: $AGENT_HOME/sessions/
