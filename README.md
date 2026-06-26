@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/ai--agent-sync-blue?style=flat-square">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
+  <img src="https://img.shields.io/badge/license-GPLv3-blue?style=flat-square">
   <img src="https://img.shields.io/badge/one--prompt-deploy-orange?style=flat-square">
 </p>
 
@@ -24,4 +24,4 @@ Agent reads [PROMPT.md](./PROMPT.md) — explains what'll happen, checks git aut
 Set up agent-sync from https://github.com/mastermindCodes/agent-sync
 ```
 
-[MIT](./LICENSE)
+[GPLv3](./LICENSE)

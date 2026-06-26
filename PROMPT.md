@@ -246,11 +246,11 @@ Figure out which agent this is. Create the appropriate hook.
 
 ### For Hermes
 
-Create a skill at `$AGENT_HOME/skills/hermes-sync/SKILL.md`:
+Create a skill at `$AGENT_HOME/skills/agent-sync/SKILL.md`:
 
 ```markdown
 ---
-name: hermes-sync
+name: agent-sync
 description: "Append session summary on /new and auto-sync to git."
 version: 1.0.0
 author: agent-sync
@@ -284,7 +284,7 @@ git diff --cached --quiet || (git commit -m "auto-sync: $(date +%Y-%m-%dT%H:%M)"
 ```
 ```
 
-Tell user: "Run `/skills load hermes-sync` to activate. Or add to config.yaml: `skills: [hermes-sync]` for auto-load."
+Tell user: "Run `/skills load agent-sync` to activate. Or add to config.yaml: `skills: [agent-sync]` for auto-load."
 
 ### For OpenClaw
 
