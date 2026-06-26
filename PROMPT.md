@@ -1,4 +1,4 @@
-# agent-sync — Multi-Device Sync Setup
+# smart-agent-sync — Multi-Device Sync Setup
 
 This prompt tells you (the AI agent) to set up git-based sync for this Hermes / OpenClaw / Claude Code / Codex / other AI agent installation.
 
@@ -35,7 +35,7 @@ Set `AGENT_HOME` to the resolved path. If you can't find it, ask the user where 
 Before doing anything, print a clear summary:
 
 ```
-? agent-sync will:
+? smart-agent-sync will:
   1. Detect your agent home directory
   2. Create a private git repo at <URL>
   3. Upload your config, skills, memories, cron, and session notes
@@ -64,7 +64,7 @@ git ls-remote <USER_REMOTE_URL> 2>&1
 - If "Repository not found" — repo doesn't exist yet. Try creating it:
   - If `gh` CLI available: `gh repo create <name> --private`
   - If GitHub token available: create via API
-  - Otherwise: tell user "Create a private repo at github.com/new named agent-sync, then come back."
+  - Otherwise: tell user "Create a private repo at github.com/new named smart-agent-sync, then come back."
 - If auth error (403/401): "Git needs authentication. Your OS credential manager should pop up."
   - Retry after user authenticates.
   - If still fails: guide user to create PAT at github.com/settings/tokens and provide it.
@@ -140,7 +140,7 @@ git fetch origin
 
 ```bash
 git add -A
-git commit -m "init: agent-sync"
+git commit -m "init: smart-agent-sync"
 git push -u origin main --force
 ```
 
@@ -218,12 +218,12 @@ with open('merged_config.yaml', 'w') as f:
 
 **`--update`**: Force push local, replace remote:
 ```bash
-cd "$AGENT_HOME" && git init && git checkout -b main && git add -A && git commit -m "agent-sync update" && git remote add origin <URL> 2>/dev/null; git fetch origin && git push -u origin main --force
+cd "$AGENT_HOME" && git init && git checkout -b main && git add -A && git commit -m "smart-agent-sync update" && git remote add origin <URL> 2>/dev/null; git fetch origin && git push -u origin main --force
 ```
 
 **`--mirror`**: Discard local, clone remote:
 ```bash
-mkdir -p /tmp/agent-sync-backup && cp "$AGENT_HOME"/sessions/*.md /tmp/agent-sync-backup/ 2>/dev/null; cd "$AGENT_HOME"/.. && mv "$(basename "$AGENT_HOME")" "$(basename "$AGENT_HOME")_old" && git clone <URL> "$(basename "$AGENT_HOME")" && cd "$AGENT_HOME" && rm -f state.db* sessions.db && rm -rf cache/ && cp /tmp/agent-sync-backup/*.md sessions/ 2>/dev/null && rm -rf /tmp/agent-sync-backup /tmp/"$(basename "$AGENT_HOME")_old" && mkdir -p cache/ logs/ audio_cache/
+mkdir -p /tmp/smart-agent-sync-backup && cp "$AGENT_HOME"/sessions/*.md /tmp/smart-agent-sync-backup/ 2>/dev/null; cd "$AGENT_HOME"/.. && mv "$(basename "$AGENT_HOME")" "$(basename "$AGENT_HOME")_old" && git clone <URL> "$(basename "$AGENT_HOME")" && cd "$AGENT_HOME" && rm -f state.db* sessions.db && rm -rf cache/ && cp /tmp/smart-agent-sync-backup/*.md sessions/ 2>/dev/null && rm -rf /tmp/smart-agent-sync-backup /tmp/"$(basename "$AGENT_HOME")_old" && mkdir -p cache/ logs/ audio_cache/
 ```
 
 **`--merge`**: Auto-merge silently, local wins on conflict. Same logic as Case 2 but no prompts. Push when done.
@@ -246,14 +246,14 @@ Figure out which agent this is. Create the appropriate hook.
 
 ### For Hermes
 
-Create a skill at `$AGENT_HOME/skills/agent-sync/SKILL.md`:
+Create a skill at `$AGENT_HOME/skills/smart-agent-sync/SKILL.md`:
 
 ```markdown
 ---
-name: agent-sync
+name: smart-agent-sync
 description: "Append session summary on /new and auto-sync to git."
 version: 1.0.0
-author: agent-sync
+author: smart-agent-sync
 license: MIT
 platforms: [linux, macos, windows]
 ---
@@ -284,7 +284,7 @@ git diff --cached --quiet || (git commit -m "auto-sync: $(date +%Y-%m-%dT%H:%M)"
 ```
 ```
 
-Tell user: "Run `/skills load agent-sync` to activate. Or add to config.yaml: `skills: [agent-sync]` for auto-load."
+Tell user: "Run `/skills load smart-agent-sync` to activate. Or add to config.yaml: `skills: [smart-agent-sync]` for auto-load."
 
 ### For OpenClaw
 
@@ -319,7 +319,7 @@ Commit and push every 30 minutes. Detect the best scheduling mechanism.
 ```python
 cronjob(
     action="create",
-    name="agent-sync",
+    name="smart-agent-sync",
     schedule="*/30 * * * *",
     script="AGENT_HOME/sessions/auto-sync.sh".replace("AGENT_HOME", AGENT_HOME),
     no_agent=True
@@ -343,18 +343,18 @@ chmod +x "$AGENT_HOME/sessions/auto-sync.sh"
 **2. systemd timer (Linux with systemd):**
 
 ```bash
-cat > /tmp/agent-sync.service << 'SVC'
+cat > /tmp/smart-agent-sync.service << 'SVC'
 [Unit]
-Description=agent-sync auto commit+push
+Description=smart-agent-sync auto commit+push
 [Service]
 Type=oneshot
 ExecStart=PATH_TO_AGENT_HOME/sessions/auto-sync.sh
 User=CHANGE_THIS_TO_YOUR_USERNAME
 SVC
 
-cat > /tmp/agent-sync.timer << 'TMR'
+cat > /tmp/smart-agent-sync.timer << 'TMR'
 [Unit]
-Description=agent-sync every 30min
+Description=smart-agent-sync every 30min
 [Timer]
 OnCalendar=*:0/30
 Persistent=true
@@ -362,10 +362,10 @@ Persistent=true
 WantedBy=timers.target
 TMR
 
-sudo mv /tmp/agent-sync.service /etc/systemd/system/
-sudo mv /tmp/agent-sync.timer /etc/systemd/system/
+sudo mv /tmp/smart-agent-sync.service /etc/systemd/system/
+sudo mv /tmp/smart-agent-sync.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now agent-sync.timer
+sudo systemctl enable --now smart-agent-sync.timer
 ```
 
 Replace `CHANGE_THIS_TO_YOUR_USERNAME` and `PATH_TO_AGENT_HOME` with actual values.
@@ -373,13 +373,13 @@ Replace `CHANGE_THIS_TO_YOUR_USERNAME` and `PATH_TO_AGENT_HOME` with actual valu
 **3. launchd (macOS):**
 
 ```bash
-cat > ~/Library/LaunchAgents/com.agent-sync.plist << 'PLIST'
+cat > ~/Library/LaunchAgents/com.smart-agent-sync.plist << 'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.agent-sync</string>
+    <string>com.smart-agent-sync</string>
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
@@ -393,7 +393,7 @@ cat > ~/Library/LaunchAgents/com.agent-sync.plist << 'PLIST'
 </dict>
 </plist>
 PLIST
-launchctl load ~/Library/LaunchAgents/com.agent-sync.plist
+launchctl load ~/Library/LaunchAgents/com.smart-agent-sync.plist
 ```
 
 **4. Windows Task Scheduler:**
@@ -405,7 +405,7 @@ $gitBash = "C:\Program Files\Git\bin\bash.exe"
 $script = "-c 'cd $env:USERPROFILE\.hermes && git add -A && git diff --cached --quiet || (git commit -m auto-sync && git push)'"
 $action = New-ScheduledTaskAction -Execute $gitBash -Argument $script
 $trigger = New-ScheduledTaskTrigger -Daily -RepetitionInterval (New-TimeSpan -Minutes 30) -RepetitionDuration (New-TimeSpan -Days 365)
-Register-ScheduledTask -TaskName "agent-sync" -Action $action -Trigger $trigger -RunLevel Highest
+Register-ScheduledTask -TaskName "smart-agent-sync" -Action $action -Trigger $trigger -RunLevel Highest
 ```
 
 If git-bash not found, try `wsl.exe git` or fall back to PowerShell-only script using git from PATH.
@@ -423,7 +423,7 @@ If git-bash not found, try `wsl.exe git` or fall back to PowerShell-only script 
 Print summary:
 
 ```
-? agent-sync installed
+? smart-agent-sync installed
 
 Agent home: $AGENT_HOME
 Mode: Smart (<uploaded local / merged / mirrored>)
